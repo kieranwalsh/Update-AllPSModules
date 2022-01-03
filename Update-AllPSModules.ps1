@@ -25,8 +25,8 @@
     Filename:       Update-AllPSModules.ps1
     Contributors:   Kieran Walsh
     Created:        2021-01-09
-    Last Updated:   2021-12-06
-    Version:        1.43.02
+    Last Updated:   2022-01-03
+    Version:        1.43.03
 #>
 [CmdletBinding()]
 Param(
@@ -42,7 +42,7 @@ if($PSVersionTable.psversion -lt [version]'5.0.0')
 if($ExecutionContext.SessionState.LanguageMode -eq 'ConstrainedLanguage')
 {
     Write-Warning 'Constrained Language mode is enabled, so the script cannot continue.'
-    continue
+    break
 }
 
 $CurrentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
