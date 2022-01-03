@@ -4,14 +4,14 @@
     .DESCRIPTION
     The script will search the usual PowerShell module profile paths for all modules and update them to the newest versions available online.
 
-    Updating modules depends on ‘PackageManagement’ and ‘PowerShellGet’, which are updated to the newest versions before upgrading any modules.
-    By default, it searches for beta, nightly, preview versions, etc., but you can exclude those with the “-NoPreviews” switch.
+    Updating modules depends on 'PackageManagement' and 'PowerShellGet', which are updated to the newest versions before upgrading any modules.
+    By default, it searches for beta, nightly, preview versions, etc., but you can exclude those with the "-NoPreviews" switch.
 
     The script presents you with a list of all modules it finds and shows you if a newer version is detected and when that new version was published.
 
-    PowerShell comes with a similar “Update-Module” command, but that does not try to update ‘PackageManagement’ and ‘PowerShellGet’.
-    It shows no data while operating, so you are left with an empty screen unless you use the “-verbose” switch, which displays too much information.
-    You can use the “-AllowPrerelease”, but only with a named module. This script will install Prerelease versions of all modules if they exist.
+    PowerShell comes with a similar "Update-Module" command, but that does not try to update 'PackageManagement' and 'PowerShellGet'.
+    It shows no data while operating, so you are left with an empty screen unless you use the "-verbose" switch, which displays too much information.
+    You can use the "-AllowPrerelease", but only with a named module. This script will install Prerelease versions of all modules if they exist.
 
     .PARAMETER NoPreviews
     If you want to avoid versions that include 'beta', 'preview', 'nightly', etc.,  and only upgrade to fully released versions of the modules, use this switch.
@@ -26,7 +26,7 @@
     Contributors:   Kieran Walsh
     Created:        2021-01-09
     Last Updated:   2022-01-03
-    Version:        1.43.03
+    Version:        1.43.04
 #>
 [CmdletBinding()]
 Param(
@@ -171,6 +171,7 @@ Sort-Object -Property 'Name'
 
 if($InstalledModules)
 {
+    $SuccessfulUpdates = 0
     Write-Host -Object " - $(($InstalledModules | Measure-Object).count) modules found."
     Write-Host -Object 'Checking for newer versions online and trying to update them.'
     $MaxNameWidth = (($InstalledModules).'Name' |
@@ -234,6 +235,7 @@ if($InstalledModules)
                 {
                     Update-Module -AcceptLicense -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
                     Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                    $SuccessfulUpdates++
                 }
                 catch
                 {
@@ -246,6 +248,7 @@ if($InstalledModules)
                 {
                     Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailable.version -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
                     Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                    $SuccessfulUpdates++
                 }
                 catch
                 {
@@ -259,6 +262,7 @@ if($InstalledModules)
                     Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailable.version -Force -Name $Module.Name -Scope 'CurrentUser' -ErrorAction 'Stop'
                     Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
                     Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
+                    $SuccessfulUpdates++
                 }
                 catch
                 {
@@ -271,6 +275,7 @@ if($InstalledModules)
                         {
                             Install-Module -Name $Module.Name -RequiredVersion $LatestAvailable.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'AllUsers' -SkipPublisherCheck -ErrorAction 'Stop'
                             Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                            $SuccessfulUpdates++
                         }
                         catch
                         {
@@ -279,6 +284,7 @@ if($InstalledModules)
                                 Install-Module -Name $Module.Name -RequiredVersion $LatestAvailable.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'CurrentUser' -SkipPublisherCheck -ErrorAction 'Stop'
                                 Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
                                 Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
+                                $SuccessfulUpdates++
                             }
                             catch
                             {
@@ -344,5 +350,11 @@ Elseif($TakenSpan.Minutes)
     $TimeTaken += "$($TakenSpan.Minutes) minutes, "
 }
 $TimeTaken += "$($TakenSpan.Seconds) seconds"
-
-"The script took $TimeTaken to complete."
+if($SuccessfulUpdates)
+{
+    Write-Host -Object "Successfully updated $($SuccessfulUpdates) module(s) in $($TimeTaken)."
+}
+Else
+{
+    Write-Host -Object "The script took $TimeTaken to complete and no updates were required."
+}
