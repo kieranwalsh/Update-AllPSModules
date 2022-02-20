@@ -25,8 +25,8 @@
     Filename:       Update-AllPSModules.ps1
     Contributors:   Kieran Walsh
     Created:        2021-01-09
-    Last Updated:   2022-01-03
-    Version:        1.43.04
+    Last Updated:   2022-02-17
+    Version:        1.45.00
 #>
 [CmdletBinding()]
 Param(
@@ -206,11 +206,31 @@ if($InstalledModules)
         {
             try
             {
-                $Module = Get-InstalledModule -Name $InstalledModule.Name -AllowPrerelease -AllVersions |
-                Sort-Object -Property {
-                    [version](($_.Version -split '-')[0])
-                } -Descending |
-                Select-Object -First 1
+                $Modules = Get-InstalledModule -Name $InstalledModule.Name -AllVersions
+
+                if($Modules.version -match '-')
+                {
+                    $CalculatedVersions = $Modules | ForEach-Object {
+                        $NewVersionNumber = $_.Version -replace '-[a-z]+[A-Z]+', '.'
+                        if($NewVersionNumber[-1] -eq '.')
+                        {
+                            $NewVersionNumber = $NewVersionNumber -replace '.$', '.0'
+                        }
+                        [PSCustomObject]@{
+                            'Name'              = $_.Name
+                            'Version'           = $_.Version
+                            'CalculatedVersion' = [version]$NewVersionNumber
+                        }
+
+                    }
+                    $Module = $CalculatedVersions | Sort-Object -Property 'CalculatedVersion' -Descending | Select-Object -First 1
+                }
+                else
+                {
+                    $Module = $Modules | Sort-Object -Property 'Version' -Descending | Select-Object -First 1
+                }
+
+
                 $LatestAvailable = Find-Module -Name $InstalledModule.Name -AllowPrerelease -ErrorAction Stop
             }
             catch
