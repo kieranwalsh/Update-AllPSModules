@@ -3,38 +3,44 @@
     <#
     .SYNOPSIS
     This script will update all locally installed PowerShell modules to the newest ones if can find online.
-    .DESCRIPTION
-    The script will search the usual PowerShell module profile paths for all modules and update them to the newest versions available online.
 
-    Updating modules depends on 'PackageManagement' and 'PowerShellGet', which are updated to the newest versions before upgrading any modules.
-    By default, it searches for beta, nightly, preview versions, etc., but you can exclude those with the "-NoPreviews" switch.
+    .DESCRIPTION
+    The script will search the usual PowerShell module profile paths for all modules and update them to the newest online versions.
+
+    Updating modules depends on 'PackageManagement' and 'PowerShellGet' updated to the newest versions before upgrading any modules.
+
+    The script searches for full releases of all modules by default, but there are switches to search for pre-release modules.
 
     The script presents you with a list of all modules it finds and shows you if a newer version is detected and when that new version was published.
 
-    PowerShell comes with a similar "Update-Module" command, but that does not try to update 'PackageManagement' and 'PowerShellGet'.
-    It shows no data while operating, so you are left with an empty screen unless you use the "-verbose" switch, which displays too much information.
-    You can use the "-AllowPrerelease", but only with a named module. This script will install Prerelease versions of all modules if they exist.
+    Differences with PowerShell's inbuilt "Update-Module" command:
+    •	"Update-Module" won't update 'PackageManagement' and 'PowerShellGet'.
+    •	It shows no data while operating, so you are left with an empty screen unless you use the "-verbose" switch, which displays too much information.
+    •	You can use the "-AllowPrerelease", but only with a named module. This script can install pre-release or nightly versions of all modules if they exist.
 
-    .PARAMETER NoPreviews
-    If you want to avoid versions that include 'beta', 'preview', 'nightly', etc.,  and only upgrade to fully released versions of the modules, use this switch.
+    .PARAMETER AllowPreviews
+    If you want to include versions that have 'preview', 'RC' etc., in the version number, use this switch. 'Nightly', and 'alpha' are considered too early so are ignored.
+
     .EXAMPLE
     Update-AllPSModules
     This will update all locally installed modules .
     .EXAMPLE
-    Update-AllPSModules -NoPreviews
-    This will update all locally installed modules but not to versions that include 'beta', 'preview', 'nightly', etc.
+    Update-AllPSModules -AllowPreviews
+    This will update all locally installed modules and include versions with 'preview' or 'RC' in the version number.
+
     .NOTES
     Filename:       Update-AllPSModules.ps1
     Contributors:   Kieran Walsh
     Created:        2021-01-09
-    Last Updated:   2022-04-01
-    Version:        1.46.0
+    Last Updated:   2022-04-23
+    Version:        1.47.0
     ProjectUri:     https://github.com/kieranwalsh/Update-AllPSModules
 #>
+
     [CmdletBinding()]
     Param(
         [Parameter()]
-        [switch]$NoPreviews
+        [switch]$AllowPreviews
     )
 
     if($PSVersionTable.psversion -lt [version]'5.0.0')
@@ -107,7 +113,7 @@
         Write-Host -Object "Searching for a newer version of 'PackageManagement'."
         try
         {
-            $OnlinePackageManagement = Find-Module -Name 'PackageManagement' -Repository 'PSGallery' -ErrorAction Stop
+            $OnlinePackageManagement = Find-Module -Name 'PackageManagement' -Repository 'PSGallery' -ErrorAction 'Stop'
         }
         catch
         {
@@ -116,7 +122,7 @@
         }
         try
         {
-            $OnlinePackageManagement | Install-Module -Force -SkipPublisherCheck -ErrorAction Stop
+            $OnlinePackageManagement | Install-Module -Force -SkipPublisherCheck -ErrorAction 'Stop'
             Write-Host -Object "Successfully installed 'PackageManagement' version '$($OnlinePackageManagement.Version)'"
         }
         catch
@@ -138,7 +144,7 @@
         Write-Host -Object "Version '$($OnlinePSGet.version)' found online, will attempt to update."
         try
         {
-            $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -ErrorAction Stop
+            $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -ErrorAction 'Stop'
             Write-Host -Object "Successfully installed 'PowerShellGet' version '$($OnlinePSGet.Version)'. Close PowerShell and re-open it to use the new module."
             $NewSessionRequired = $true
         }
@@ -147,7 +153,7 @@
             Write-Host -Object "Unable to install to 'C:\Program Files\WindowsPowerShell\Modules' so will try the Current User module path instead."
             try
             {
-                $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction Stop
+                $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction 'Stop'
                 Write-Host -Object "Successfully installed 'PowerShellGet' version '$($OnlinePSGet.Version)'. Close PowerShell and re-open it to use the new module."
                 $NewSessionRequired = $true
             }
@@ -168,7 +174,7 @@
 
     $InstalledModules = Get-InstalledModule |
     Where-Object -FilterScript {
-    ($_.name -notmatch 'PackageManagement|PowerShellGet|Az\.|AzureRM\.|Azure\.|PSReadline')
+    ($_.name -notmatch 'PackageManagement|PowerShellGet|Az\.|AzureRM\.|Azure\.')
     } |
     Sort-Object -Property 'Name'
 
@@ -188,7 +194,7 @@
         foreach($InstalledModule in $InstalledModules)
         {
             Write-Host -Object ("{0,-$MaxNameWidth}" -f $InstalledModule.Name ) -NoNewline
-            if($NoPreviews)
+            if(-not($AllowPreviews))
             {
                 try
                 {
@@ -197,7 +203,7 @@
                         [version](($_.Version -split '-')[0])
                     } -Descending |
                     Select-Object -First 1
-                    $LatestAvailable = Find-Module -Name $InstalledModule.Name -ErrorAction Stop
+                    $LatestAvailableOnline = Find-Module -Name $InstalledModule.Name -ErrorAction 'Stop'
                 }
                 catch
                 {
@@ -210,9 +216,9 @@
                 try
                 {
                     $Modules = Get-InstalledModule -Name $InstalledModule.Name -AllVersions
-
                     if($Modules.version -match '-')
                     {
+                        $UpdateType = ($Modules.version -split '-')[1]
                         $CalculatedVersions = $Modules | ForEach-Object {
                             $NewVersionNumber = $_.Version -replace '-[a-z]+[A-Z]+', '.'
                             if($NewVersionNumber[-1] -eq '.')
@@ -223,18 +229,16 @@
                                 'Name'              = $_.Name
                                 'Version'           = $_.Version
                                 'CalculatedVersion' = [version]$NewVersionNumber
+                                'Update Type'       = $UpdateType
                             }
-
                         }
                         $Module = $CalculatedVersions | Sort-Object -Property 'CalculatedVersion' -Descending | Select-Object -First 1
                     }
                     else
                     {
-                        $Module = $Modules | Sort-Object -Property 'Version' -Descending | Select-Object -First 1
+                        $Module = $Modules | Sort-Object -Property {[version]$_.'Version'} -Descending | Select-Object -First 1
                     }
-
-
-                    $LatestAvailable = Find-Module -Name $InstalledModule.Name -AllowPrerelease -ErrorAction Stop
+                    $LatestAvailableOnline = (Find-Module -Name $InstalledModule.Name -AllowPrerelease -AllVersions -ErrorAction 'Stop' | Where-Object {$_.Version -notmatch 'nightly|alpha'})[0]
                 }
                 catch
                 {
@@ -243,16 +247,16 @@
                 }
             }
             Write-Host -Object ("{0,-$MaxVersionWidth}" -f $Module.Version) -NoNewline
-            if(([version](($Module.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')) -ge ([version](($LatestAvailable.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')))
+            if(([version](($Module.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')) -ge ([version](($LatestAvailableOnline.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')))
             {
                 Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
             }
             else
             {
                 $AllUsersFailed = $false
-                $Gap = (20 - (($LatestAvailable.version).length))
-                Write-Host -Object ("Online version found: '{0}' - attempting to update. {1,$Gap}" -f "$($LatestAvailable.version)' - Published '$(Get-Date($LatestAvailable.PublishedDate) -Format 'yyyy-MM-dd')", ' ') -ForegroundColor 'Yellow' -NoNewline
-                If($NoPreviews)
+                $Gap = (20 - (($LatestAvailableOnline.version).length))
+                Write-Host -Object ("Online version found: '{0}' - attempting to update. {1,$Gap}" -f "$($LatestAvailableOnline.version)' - Published '$(Get-Date($LatestAvailableOnline.PublishedDate) -Format 'yyyy-MM-dd')", ' ') -ForegroundColor 'Yellow' -NoNewline
+                if(-not($AllowPreviews))
                 {
                     try
                     {
@@ -269,7 +273,7 @@
                 {
                     try
                     {
-                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailable.version -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
+                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
                         Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
                         $SuccessfulUpdates++
                     }
@@ -282,7 +286,7 @@
                 {
                     try
                     {
-                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailable.version -Force -Name $Module.Name -Scope 'CurrentUser' -ErrorAction 'Stop'
+                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope 'CurrentUser' -ErrorAction 'Stop'
                         Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
                         Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
                         $SuccessfulUpdates++
@@ -296,7 +300,7 @@
                             Uninstall-Module -Name $Module.Name -AllowPrerelease -AllVersions -Force -ErrorAction 'Stop'
                             try
                             {
-                                Install-Module -Name $Module.Name -RequiredVersion $LatestAvailable.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'AllUsers' -SkipPublisherCheck -ErrorAction 'Stop'
+                                Install-Module -Name $Module.Name -RequiredVersion $LatestAvailableOnline.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'AllUsers' -SkipPublisherCheck -ErrorAction 'Stop'
                                 Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
                                 $SuccessfulUpdates++
                             }
@@ -304,7 +308,7 @@
                             {
                                 try
                                 {
-                                    Install-Module -Name $Module.Name -RequiredVersion $LatestAvailable.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'CurrentUser' -SkipPublisherCheck -ErrorAction 'Stop'
+                                    Install-Module -Name $Module.Name -RequiredVersion $LatestAvailableOnline.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'CurrentUser' -SkipPublisherCheck -ErrorAction 'Stop'
                                     Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
                                     Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
                                     $SuccessfulUpdates++
@@ -329,13 +333,13 @@
         '. None found.'
     }
 
-    $OnlinePSGet = Find-Module -Name 'PowershellGet' -AllowPrerelease -Repository 'PSGallery' -ErrorAction Stop
+    $OnlinePSGet = Find-Module -Name 'PowershellGet' -AllowPrerelease -Repository 'PSGallery' -ErrorAction 'Stop'
     if(([version](($PowershellGet.Version -split ('-'))[0])) -lt ([version](($OnlinePSGet.Version -split ('-'))[0])))
     {
         Write-Host -Object "A newer version of 'PowerShellGet' is available online, will attempt to update."
         try
         {
-            $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -ErrorAction Stop
+            $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -ErrorAction 'Stop'
             Write-Host -Object "Successfully installed 'PowerShellGet' version '$($OnlinePSGet.Version)'. Close PowerShell and re-open it to use the new module."
             $NewSessionRequired = $true
         }
@@ -344,7 +348,7 @@
             Write-Host -Object "Unable to install to 'C:\Program Files\WindowsPowerShell\Modules' so will try the Current User module path instead."
             try
             {
-                $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction Stop
+                $OnlinePSGet | Install-Module -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction 'Stop'
                 Write-Host -Object "Successfully installed 'PowerShellGet' version '$($OnlinePSGet.Version)'. Close PowerShell and re-open it to use the new module."
                 $NewSessionRequired = $true
             }
