@@ -32,15 +32,16 @@
     Filename:       Update-AllPSModules.ps1
     Contributors:   Kieran Walsh
     Created:        2021-01-09
-    Last Updated:   2022-04-23
-    Version:        1.47.0
+    Last Updated:   2023-02-10
+    Version:        1.47.0.3
     ProjectUri:     https://github.com/kieranwalsh/Update-AllPSModules
 #>
 
     [CmdletBinding()]
     Param(
         [Parameter()]
-        [switch]$AllowPreviews
+        [switch]$AllowPreviews,
+        [switch]$AllUsers
     )
 
     if($PSVersionTable.psversion -lt [version]'5.0.0')
@@ -82,7 +83,7 @@
         }
         catch
         {
-            'Unable to Set the PSRepository'
+            'Unable to make the PSGallery a trusted repository. The script cannot continue.'
             break
         }
     }
@@ -256,11 +257,20 @@
                 $AllUsersFailed = $false
                 $Gap = (20 - (($LatestAvailableOnline.version).length))
                 Write-Host -Object ("Online version found: '{0}' - attempting to update. {1,$Gap}" -f "$($LatestAvailableOnline.version)' - Published '$(Get-Date($LatestAvailableOnline.PublishedDate) -Format 'yyyy-MM-dd')", ' ') -ForegroundColor 'Yellow' -NoNewline
+                if($AllUsers)
+                {
+                    $Scope -eq 'AllUsers'
+                }
+                Else
+                {
+                    $Scope -eq 'CurrentUser'
+                }
+
                 if(-not($AllowPreviews))
                 {
                     try
                     {
-                        Update-Module -AcceptLicense -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
+                        Update-Module -AcceptLicense -Force -Name $Module.Name -Scope $Scope -ErrorAction 'Stop'
                         Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
                         $SuccessfulUpdates++
                     }
@@ -273,7 +283,7 @@
                 {
                     try
                     {
-                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
+                        Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope $Scope -ErrorAction 'Stop'
                         Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
                         $SuccessfulUpdates++
                     }
@@ -362,8 +372,9 @@
 
     if($Failed)
     {
+        ' '
         'Unable to find these modules:'
-        $Failed
+        $Failed | ForEach-Object {`t$_.Name}
     }
     $EndTime = Get-Date
     $TimeTaken = ''
