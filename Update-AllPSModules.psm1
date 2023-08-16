@@ -32,8 +32,8 @@
     Filename:       Update-AllPSModules.ps1
     Contributors:   Kieran Walsh
     Created:        2021-01-09
-    Last Updated:   2022-04-23
-    Version:        1.47.0
+    Last Updated:   2023-04-28
+    Version:        1.48.00
     ProjectUri:     https://github.com/kieranwalsh/Update-AllPSModules
 #>
 
@@ -61,6 +61,17 @@
         Break
     }
     $StartTime = Get-Date
+
+    if ($Host.Name -eq 'ConsoleHost')
+    {
+        $PositiveSymbol = '[+]'
+        $NegativeSymbol = '[-]'
+    }
+    else
+    {
+        $PositiveSymbol = $([char]0x2714)
+        $NegativeSymbol = $([char]0x2718)
+    }
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $NewSessionRequired = $false
@@ -249,7 +260,7 @@
             Write-Host -Object ("{0,-$MaxVersionWidth}" -f $Module.Version) -NoNewline
             if(([version](($Module.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')) -ge ([version](($LatestAvailableOnline.Version -replace '[a-z]*', '').Replace('-', '.') -replace '\.$', '')))
             {
-                Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                Write-Host -Object $PositiveSymbol -ForegroundColor 'Green'
             }
             else
             {
@@ -261,7 +272,7 @@
                     try
                     {
                         Update-Module -AcceptLicense -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
-                        Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                        Write-Host -Object $PositiveSymbol -ForegroundColor 'Green'
                         $SuccessfulUpdates++
                     }
                     catch
@@ -274,7 +285,7 @@
                     try
                     {
                         Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope 'AllUsers' -ErrorAction 'Stop'
-                        Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                        Write-Host -Object $PositiveSymbol -ForegroundColor 'Green'
                         $SuccessfulUpdates++
                     }
                     catch
@@ -287,13 +298,13 @@
                     try
                     {
                         Update-Module -AcceptLicense -AllowPrerelease -RequiredVersion $LatestAvailableOnline.version -Force -Name $Module.Name -Scope 'CurrentUser' -ErrorAction 'Stop'
-                        Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
+                        Write-Host -Object $PositiveSymbol -ForegroundColor 'Green' -NoNewline
                         Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
                         $SuccessfulUpdates++
                     }
                     catch
                     {
-                        Write-Host -Object ([char]0x2718) -ForegroundColor 'Red' -NoNewline
+                        Write-Host -Object $NegativeSymbol -ForegroundColor 'Red' -NoNewline
                         Write-Host -Object (' Update not possible, will uninstall and try a new install. ') -ForegroundColor 'Yellow' -NoNewline
                         try
                         {
@@ -301,7 +312,7 @@
                             try
                             {
                                 Install-Module -Name $Module.Name -RequiredVersion $LatestAvailableOnline.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'AllUsers' -SkipPublisherCheck -ErrorAction 'Stop'
-                                Write-Host -Object $([char]0x2714) -ForegroundColor 'Green'
+                                Write-Host -Object $PositiveSymbol -ForegroundColor 'Green'
                                 $SuccessfulUpdates++
                             }
                             catch
@@ -309,19 +320,19 @@
                                 try
                                 {
                                     Install-Module -Name $Module.Name -RequiredVersion $LatestAvailableOnline.version -AcceptLicense -AllowClobber -AllowPrerelease -Force -Scope 'CurrentUser' -SkipPublisherCheck -ErrorAction 'Stop'
-                                    Write-Host -Object $([char]0x2714) -ForegroundColor 'Green' -NoNewline
+                                    Write-Host -Object $PositiveSymbol -ForegroundColor 'Green' -NoNewline
                                     Write-Host -Object " ('Current User' scope only)" -ForegroundColor 'Yellow'
                                     $SuccessfulUpdates++
                                 }
                                 catch
                                 {
-                                    Write-Host -Object ([char]0x2718) -ForegroundColor 'Red'
+                                    Write-Host -Object $NegativeSymbol -ForegroundColor 'Red'
                                 }
                             }
                         }
                         catch
                         {
-                            Write-Host -Object ([char]0x2718) -ForegroundColor 'Red'
+                            Write-Host -Object $NegativeSymbol -ForegroundColor 'Red'
                         }
                     }
                 }
