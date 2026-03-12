@@ -7,7 +7,6 @@ Updates all locally installed PowerShell modules to the latest versions availabl
 - Automatically updates `PackageManagement` and `PowerShellGet` prerequisites before processing other modules.
 - Installs to **CurrentUser** scope by default — no admin required.
 - Optional `-AllUsers` switch for system-wide installs (requires elevation).
-- Optional `-AllowPreviews` switch to include preview and RC versions (excludes nightly and alpha builds).
 - Displays a formatted list of all modules with current vs. available versions.
 - Falls back to uninstall/reinstall if a standard update fails.
 - Excludes the `Az` and `Microsoft.Graph` meta-modules (to avoid reinstalling all submodules). Individual submodules (e.g., `Az.Accounts`, `Microsoft.Graph.Users`) are updated individually.
@@ -26,9 +25,6 @@ Update-InstalledModule
 
 # Update all modules (AllUsers scope, requires admin)
 Update-InstalledModule -AllUsers
-
-# Include preview and RC versions
-Update-InstalledModule -AllowPreviews
 ```
 
 ## Sample Output

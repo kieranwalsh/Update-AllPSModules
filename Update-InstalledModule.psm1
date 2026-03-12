@@ -16,12 +16,8 @@
     Differences with PowerShell's built-in 'Update-Module' command:
         - 'Update-Module' will not update 'PackageManagement' and 'PowerShellGet'.
         - It shows no data while operating unless you use '-Verbose', which displays too much information.
-        - You can use '-AllowPrerelease', but only with a named module. This function can install pre-release versions of all modules.
 
     The Az and Microsoft.Graph meta-modules are excluded to avoid reinstalling all submodules. Individual submodules (e.g., Az.Accounts, Microsoft.Graph.Users) are updated individually.
-
-    .PARAMETER AllowPreviews
-    Include versions that have 'preview' or 'RC' in the version number. 'Nightly' and 'alpha' builds are excluded.
 
     .PARAMETER AllUsers
     Install updates to the AllUsers scope. Requires running as administrator.
@@ -34,10 +30,6 @@
     Update-InstalledModule -AllUsers
     Updates all locally installed modules to the AllUsers scope (requires elevation).
 
-    .EXAMPLE
-    Update-InstalledModule -AllowPreviews
-    Updates all locally installed modules including preview and RC versions.
-
     .NOTES
     Filename:       Update-InstalledModule.psm1
     Contributors:   Kieran Walsh
@@ -49,9 +41,6 @@
 
     [CmdletBinding()]
     param(
-        [Parameter()]
-        [switch]$AllowPreviews,
-
         [Parameter()]
         [switch]$AllUsers
     )
@@ -222,39 +211,10 @@
 
         try
         {
-            if ($AllowPreviews)
-            {
-                $Modules = Get-InstalledModule -Name $InstalledModule.Name -AllVersions
-                if ($Modules.Version -match '-')
-                {
-                    $UpdateType = ($Modules.Version -split '-')[1]
-                    $CalculatedVersions = $Modules | ForEach-Object {
-                        $NewVersionNumber = $_.Version -replace '-[a-zA-Z]+', '.'
-                        if ($NewVersionNumber[-1] -eq '.')
-                        {
-                            $NewVersionNumber = $NewVersionNumber -replace '\.$', '.0'
-                        }
-                        [PSCustomObject]@{
-                            'Name'              = $_.Name
-                            'Version'           = $_.Version
-                            'CalculatedVersion' = [version]$NewVersionNumber
-                            'UpdateType'        = $UpdateType
-                        }
-                    }
-                    $Module = $CalculatedVersions | Sort-Object -Property 'CalculatedVersion' -Descending | Select-Object -First 1
-                } else
-                {
-                    $Module = $Modules | Sort-Object -Property { [version]$_.Version } -Descending | Select-Object -First 1
-                }
-                $LatestAvailableOnline = (Find-Module -Name $InstalledModule.Name -AllowPrerelease -AllVersions -ErrorAction 'Stop' |
-                    Where-Object { $_.Version -notmatch 'nightly|alpha' })[0]
-            } else
-            {
-                $Module = Get-InstalledModule -Name $InstalledModule.Name |
-                Sort-Object -Property { [version](($_.Version -split '-')[0]) } -Descending |
-                Select-Object -First 1
-                $LatestAvailableOnline = Find-Module -Name $InstalledModule.Name -ErrorAction 'Stop'
-            }
+            $Module = Get-InstalledModule -Name $InstalledModule.Name |
+            Sort-Object -Property { [version](($_.Version -split '-')[0]) } -Descending |
+            Select-Object -First 1
+            $LatestAvailableOnline = Find-Module -Name $InstalledModule.Name -ErrorAction 'Stop'
         } catch
         {
             $FailedModules.Add($InstalledModule)
@@ -294,12 +254,6 @@
                 ErrorAction   = 'Stop'
             }
 
-            if ($AllowPreviews)
-            {
-                $UpdateParams['AllowPrerelease'] = $true
-                $UpdateParams['RequiredVersion'] = $LatestAvailableOnline.Version
-            }
-
             try
             {
                 Update-Module @UpdateParams
@@ -319,11 +273,6 @@
                         SkipPublisherCheck = $true
                         ErrorAction        = 'Stop'
                     }
-                    if ($AllowPreviews)
-                    {
-                        $InstallParams['AllowPrerelease'] = $true
-                        $InstallParams['RequiredVersion'] = $LatestAvailableOnline.Version
-                    }
                     Install-Module @InstallParams 3>$null
                     Write-Host -Object $PositiveSymbol -ForegroundColor 'Green'
                     $SuccessfulUpdates++
@@ -337,7 +286,7 @@
     #EndRegion Update modules
 
     #Region PowerShellGet final check
-    $OnlinePSGet = Find-Module -Name 'PowerShellGet' -AllowPrerelease -Repository 'PSGallery' -ErrorAction 'SilentlyContinue'
+    $OnlinePSGet = Find-Module -Name 'PowerShellGet' -Repository 'PSGallery' -ErrorAction 'SilentlyContinue'
     if ($OnlinePSGet)
     {
         $LocalPSGetVersion = [version](($PowerShellGet.Version -split '-')[0])
