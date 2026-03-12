@@ -1,17 +1,38 @@
-# Update-AllPSModules
+# Update-InstalledModule
 
-This module will update all locally installed PowerShell modules to the latest version it can find online. It will also attempt to update PackageManagement and PowerShellGet so that it can update to pre-release versions.
+Updates all locally installed PowerShell modules to the latest versions available on PSGallery.
 
-You can install it using the following command:
+## Features
 
+- Automatically updates `PackageManagement` and `PowerShellGet` prerequisites before processing other modules.
+- Installs to **CurrentUser** scope by default — no admin required.
+- Optional `-AllUsers` switch for system-wide installs (requires elevation).
+- Optional `-AllowPreviews` switch to include preview and RC versions (excludes nightly and alpha builds).
+- Displays a formatted list of all modules with current vs. available versions.
+- Falls back to uninstall/reinstall if a standard update fails.
+- Excludes the `Az` and `Microsoft.Graph` meta-modules (to avoid reinstalling all submodules). Individual submodules (e.g., `Az.Accounts`, `Microsoft.Graph.Users`) are updated individually.
+
+## Installation
+
+```powershell
+Install-Module -Name 'Update-InstalledModule'
 ```
-Install-Module update-AllPSModules
+
+## Usage
+
+```powershell
+# Update all modules (CurrentUser scope)
+Update-InstalledModule
+
+# Update all modules (AllUsers scope, requires admin)
+Update-InstalledModule -AllUsers
+
+# Include preview and RC versions
+Update-InstalledModule -AllowPreviews
 ```
 
-You can use the '-NoPreviews' switch to avoid modules with 'beta', 'nightly', 'preview' etc., in the name.
+## Sample Output
 
-This is what it looks like while running:
+![Image of Update-InstalledModule sample](https://github.com/kieranwalsh/img/blob/main/Update-AllPSModules%20Sample.png)
 
-![Image of Update-AllPSModules sample](https://github.com/kieranwalsh/img/blob/main/Update-AllPSModules%20Sample.png)
-
-![Gif of Update-AllPSModules in action](https://github.com/kieranwalsh/img/blob/main/Update-AllPSModules.gif)
+![Gif of Update-InstalledModule in action](https://github.com/kieranwalsh/img/blob/main/Update-AllPSModules.gif)
